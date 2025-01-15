@@ -90,7 +90,7 @@ function myRender(element, container) {
       nextFiber = nextFiber.parent;
     }
   }
-  container.appendChild(dom);
+  // container.appendChild(dom);
 }
 
 export default myRender;
