@@ -14,83 +14,108 @@ function creatDom(fiber) {
 }
 
 let nextUnitOfWork = null;
+// 记录整颗Fiber树
+let wipRoot = null;
+
 function myRender(element, container) {
-  nextUnitOfWork = {
+  // 初始化下一个工作单元（根节点）
+  wipRoot = {
     dom: container,
     props: {
       children: [element],
     },
+    sibling: null,
+    child: null,
+    parent: null,
   };
-
-  function workLoop(deadline) {
-    let shouldYield = false;
-    while (nextUnitOfWork && !shouldYield) {
-      nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
-      shouldYield = deadline.timeRemaining() < 1;
-    }
-    requestIdleCallback(workLoop);
+  nextUnitOfWork = wipRoot;
+}
+function workLoop(deadline) {
+  let shouldYield = false;
+  while (nextUnitOfWork && !shouldYield) {
+    nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
+    shouldYield = deadline.timeRemaining() < 1;
   }
-
+  if (!nextUnitOfWork && wipRoot) {
+    commitRoot();
+  }
   requestIdleCallback(workLoop);
+}
 
-  function performUnitOfWork(fiber) {
-    // add dom node
-    if (!fiber.dom) {
-      fiber.dom = creatDom(fiber);
-    }
-    // 如果当前节点存在父节点，将其挂载到父节点下
-    if (fiber.parent) {
-      fiber.parent.dom.append(fiber.dom);
-    }
-    // 为每一个chid创建一个新的 fiber
-    const elements = fiber.props.children;
-    let index = 0;
-    // 记录上一个fiber
-    let prevSibling = null;
-    while (index < elements.length) {
-      const element = elements[index];
+requestIdleCallback(workLoop);
 
-      const newFiber = {
-        // 记录元素标签类型
-        type: element.type,
-        // 记录元素属性
-        props: element.props,
-        // 与父节点创建链接
-        parent: fiber,
-        // 此时DOM还未生成 初始化null
-        // 下一次进入performUnitOfWork时
-        // 通过createDOM函数生成
-        dom: null,
-        // 与第一个子节点关联 初始化null
-        child: null,
-        // 与兄弟节点创建链接 初始化null
-        sibling: null,
-      };
-      if (index === 0) {
-        fiber.child = newFiber;
-      } else {
-        prevSibling.sibling = newFiber;
-      }
-      prevSibling = newFiber;
-      index++;
-    }
-    // 选出下一个工作单元
-    if (fiber.child) {
-      // 如果有child直接返回child
-      return fiber.child;
-    }
-    let nextFiber = fiber;
-    while (nextFiber) {
-      if (nextFiber.sibling) {
-        //无child，则返回兄弟节点
-        return nextFiber.sibling;
-      }
-      // 当此层的兄弟节点也处理完时
-      // 返回其父节点 继续处理其父节点所在层的兄弟节点
-      nextFiber = nextFiber.parent;
-    }
+function performUnitOfWork(fiber) {
+  // add dom node
+  if (!fiber.dom) {
+    fiber.dom = creatDom(fiber);
   }
-  // container.appendChild(dom);
+  // 如果当前节点存在父节点，将其挂载到父节点下
+  // if (fiber.parent) {
+  //   fiber.parent.dom.append(fiber.dom);
+  // }
+
+  // 为每一个chid创建一个新的 fiber
+  const elements = fiber.props.children;
+  let index = 0;
+  // 记录上一个fiber
+  let prevSibling = null;
+  while (index < elements.length) {
+    const element = elements[index];
+
+    const newFiber = {
+      // 记录元素标签类型
+      type: element.type,
+      // 记录元素属性
+      props: element.props,
+      // 与父节点创建链接
+      parent: fiber,
+      // 此时DOM还未生成 初始化null
+      // 下一次进入performUnitOfWork时
+      // 通过createDOM函数生成
+      dom: null,
+      // 与第一个子节点关联 初始化null
+      child: null,
+      // 与兄弟节点创建链接 初始化null
+      sibling: null,
+    };
+    if (index === 0) {
+      fiber.child = newFiber;
+    } else {
+      prevSibling.sibling = newFiber;
+    }
+    prevSibling = newFiber;
+    index++;
+  }
+  // 选出下一个工作单元
+  if (fiber.child) {
+    // 如果有child直接返回child
+    return fiber.child;
+  }
+  let nextFiber = fiber;
+  while (nextFiber) {
+    if (nextFiber.sibling) {
+      //无child，则返回兄弟节点
+      return nextFiber.sibling;
+    }
+    // 当此层的兄弟节点也处理完时
+    // 返回其父节点 继续处理其父节点所在层的兄弟节点
+    nextFiber = nextFiber.parent;
+  }
+}
+
+// commit阶段
+function commitRoot() {
+  commitWork(wipRoot.child);
+  wipRoot = null;
+}
+function commitWork(fiber) {
+  if (!fiber) {
+    return;
+  }
+  const domParent = fiber.parent.dom;
+  domParent.appendChild(fiber.dom);
+  commitWork(fiber.child);
+  commitWork(fiber.sibling);
 }
 
 export default myRender;
