@@ -159,6 +159,7 @@ function performUnitOfWork(fiber) {
 let currentRoot = null;
 // commit阶段
 function commitRoot() {
+  deletions.forEach(commitWork);
   commitWork(wipRoot.child);
   currentRoot = wipRoot;
   wipRoot = null;
@@ -168,9 +169,46 @@ function commitWork(fiber) {
     return;
   }
   const domParent = fiber.parent.dom;
-  domParent.appendChild(fiber.dom);
+  if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
+    domParent.appendChild(fiber.dom);
+  } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
+    updateDom(fiber.dom, fiber.alternate.props, fiber.props);
+  } else if (fiber.effectTag === "DELETION") {
+    domParent.removeChild(fiber.dom);
+  }
+
   commitWork(fiber.child);
   commitWork(fiber.sibling);
+}
+function updateDom(dom, prevProps, nextProps) {
+  // 删除已经没有的props
+  Object.keys(prevProps)
+    .filter((key) => key !== "children")
+    .filter((key) => !(key in nextProps))
+    .forEach((name) => (dom[name] = ""));
+  // 赋予新的或者改变的props
+  Object.keys(nextProps)
+    .filter((key) => key !== "children")
+    .filter((key) => !(key in prevProps) || prevProps[key] !== nextProps[key])
+    .forEach((name) => (dom[name] = nextProps[name]));
+
+  // 删除已经没有的或者发生变化的事件处理函数
+  Object.keys(prevProps)
+    .filter((key) => key.startsWith("on"))
+    .filter((key) => !(key in nextProps) || prevProps[key] !== nextProps[key])
+    .forEach((name) => {
+      const eventType = name.toLowerCase().substring(2);
+      dom.removeEventListener(eventType, prevProps[name]);
+    });
+
+  // 添加新的事件处理函数
+  Object.keys(nextProps)
+    .filter((key) => key.startsWith("on"))
+    .filter((key) => prevProps[key] !== nextProps[key])
+    .forEach((name) => {
+      const eventType = name.toLowerCase().substring(2);
+      dom.addEventListener(eventType, prevProps[name]);
+    });
 }
 
 export default myRender;
