@@ -1,12 +1,19 @@
 import { myCreatElement, myRender } from "./react";
 
-const element = myCreatElement(
-  "h1",
-  { id: "title" },
-  "hello world",
-  myCreatElement("a", { href: "https://xxx.com" }, "yyy")
-);
+const handleInput = (e) => {
+  console.log("handleInput");
 
-const container = document.getElementById("root");
+  renderer(e.target.value);
+};
+const renderer = (value) => {
+  const container = document.querySelector("#root");
+  const element = myCreatElement(
+    "div",
+    null,
+    myCreatElement("input", { oninput: (e) => handleInput(e) }, null),
+    myCreatElement("h1", null, value)
+  );
+  myRender(element, container);
+};
 
-myRender(element, container);
+renderer("hello");
