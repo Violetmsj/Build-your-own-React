@@ -13,13 +13,6 @@ function creatDom(fiber) {
   return dom;
 }
 
-let nextUnitOfWork = null;
-// 记录整颗Fiber树
-let wipRoot = null;
-
-// diffing中记录要删除的节点
-let deletions = null;
-
 function myRender(element, container) {
   // 初始化下一个工作单元（根节点）
   wipRoot = {
@@ -36,12 +29,20 @@ function myRender(element, container) {
   deletions = [];
   nextUnitOfWork = wipRoot;
 }
+let nextUnitOfWork = null;
+// 记录整颗Fiber树
+let wipRoot = null;
+
+// diffing中记录要删除的节点
+let deletions = null;
+// 最后一次 commit 到 DOM 的一棵 Fiber Tree 的引用进行保存
+let currentRoot = null;
 function reconcileChildren(wipFiber, elements) {
   //index单纯为了while循环
   let index = 0;
   let prevSibling = null;
   let oldFiber = wipFiber.alternate && wipFiber.alternate.child;
-  while (index < elements.length || oldFiber != null) {
+  while (index < elements.length || oldFiber) {
     const element = elements[index];
     const sameType = oldFiber && element && element.type == oldFiber.type;
     let newFiber = null;
@@ -74,6 +75,7 @@ function reconcileChildren(wipFiber, elements) {
     if (index === 0) {
       wipFiber.child = newFiber;
     } else {
+      // prevSibling ? (prevSibling.sibling = newFiber) : "";
       prevSibling.sibling = newFiber;
     }
 
@@ -155,8 +157,6 @@ function performUnitOfWork(fiber) {
     nextFiber = nextFiber.parent;
   }
 }
-// 最后一次 commit 到 DOM 的一棵 Fiber Tree 的引用进行保存
-let currentRoot = null;
 // commit阶段
 function commitRoot() {
   deletions.forEach(commitWork);
@@ -168,13 +168,22 @@ function commitWork(fiber) {
   if (!fiber) {
     return;
   }
-  const domParent = fiber.parent.dom;
-  if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
-    domParent.appendChild(fiber.dom);
-  } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
+  // const domParent = fiber.parent.dom;
+  // if (fiber.effectTag === "PLACEMENT" && fiber.dom) {
+  //   // domParent.appendChild(fiber.dom);
+  //   domParent.append(fiber.dom);
+  // } else if (fiber.effectTag === "UPDATE" && fiber.dom) {
+  //   updateDom(fiber.dom, fiber.alternate.props, fiber.props);
+  // } else if (fiber.effectTag === "DELETION") {
+  //   domParent.removeChild(fiber.dom);
+  // }
+  const parentDOM = fiber.parent.dom;
+  if (fiber.effectTag === "PLACEMENT" && fiber.dom) {
+    parentDOM.append(fiber.dom);
+  } else if (fiber.effectTag === "DELETION" && fiber.dom) {
+    parentDOM.removeChild(fiber.dom);
+  } else if (fiber.effectTag === "UPDATE" && fiber.dom) {
     updateDom(fiber.dom, fiber.alternate.props, fiber.props);
-  } else if (fiber.effectTag === "DELETION") {
-    domParent.removeChild(fiber.dom);
   }
 
   commitWork(fiber.child);
