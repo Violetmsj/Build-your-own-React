@@ -18,5 +18,4 @@ function createTextElement(text) {
     },
   };
 }
-
 export default myCreateElement;

@@ -100,27 +100,13 @@ function workLoop(deadline) {
 requestIdleCallback(workLoop);
 
 function performUnitOfWork(fiber) {
+  // 区分函数式组件
   const isFunctionComponent = fiber.type instanceof Function;
   if (isFunctionComponent) {
     updateFunctionComponent(fiber);
   } else {
     updateHostComponent(fiber);
   }
-
-  // 处理非函数式组件
-  function updateHostComponent(fiber) {
-    if (!fiber.dom) {
-      fiber.dom = createDom(fiber);
-    }
-    const elements = fiber.props.children;
-    reconcileChildren(fiber, elements);
-  }
-  // 处理函数式组件
-  function updateFunctionComponent(fiber) {
-    const children = [fiber.type(fiber.props)];
-    reconcileChildren(fiber, children);
-  }
-
   // 选出下一个工作单元
   if (fiber.child) {
     // 如果有child直接返回child
@@ -136,6 +122,58 @@ function performUnitOfWork(fiber) {
     // 返回其父节点 继续处理其父节点所在层的兄弟节点
     nextFiber = nextFiber.parent;
   }
+}
+// 处理非函数式组件
+function updateHostComponent(fiber) {
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+  const elements = fiber.props.children;
+  reconcileChildren(fiber, elements);
+}
+// 处理函数式组件
+function updateFunctionComponent(fiber) {
+  wipFiber = fiber;
+  hookIndex = 0;
+  wipFiber.hooks = [];
+  const children = [fiber.type(fiber.props)];
+  reconcileChildren(fiber, children);
+}
+/**
+ * wipFiber相当于currentRoot.child
+ * 在这里单独抽出来记录
+ */
+let wipFiber = null;
+let hookIndex = null;
+export function useState(init) {
+  const oldHook =
+    wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex];
+  const hook = {
+    state: oldHook ? oldHook.state : init,
+    queue: [],
+  };
+
+  const actions = oldHook ? oldHook.queue : [];
+  actions.forEach((action) => {
+    hook.state = typeof action === "function" ? action(hook.state) : action;
+  });
+  const setState = (action) => {
+    hook.queue.push(action);
+    wipRoot = {
+      dom: currentRoot.dom,
+      props: currentRoot.props,
+      alternate: currentRoot,
+    };
+    // 触发页面重新渲染
+    nextUnitOfWork = wipRoot;
+    deletions = [];
+  };
+  wipFiber.hooks.push(hook);
+  hookIndex++;
+
+  return [hook.state, setState];
 }
 // commit阶段
 function commitRoot() {
@@ -204,5 +242,4 @@ function updateDom(dom, prevProps, nextProps) {
       dom.addEventListener(eventType, prevProps[name]);
     });
 }
-
 export default myRender;
