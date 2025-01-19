@@ -78,6 +78,7 @@ function reconcileChildren(wipFiber, elements) {
       prevSibling.sibling = newFiber;
     }
     prevSibling = newFiber;
+    // 如果存在旧Fiber节点，则将oldFiber更新为其兄弟节点（oldFiber.sibling），以便在下一次循环中处理下一个旧Fiber节点。
     if (oldFiber) {
       oldFiber = oldFiber.sibling;
     }

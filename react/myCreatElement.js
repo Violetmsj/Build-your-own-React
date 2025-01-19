@@ -1,4 +1,4 @@
-function myCreatElement(type, props, ...children) {
+function myCreateElement(type, props, ...children) {
   return {
     type,
     props: {
@@ -19,4 +19,4 @@ function createTextElement(text) {
   };
 }
 
-export default myCreatElement;
+export default myCreateElement;
