@@ -1,4 +1,4 @@
-function creatDom(fiber) {
+function createDom(fiber) {
   // create dom nodes
   const dom =
     fiber.type == "TEXT_ELEMENT"
@@ -100,48 +100,26 @@ function workLoop(deadline) {
 requestIdleCallback(workLoop);
 
 function performUnitOfWork(fiber) {
-  // add dom node
-  if (!fiber.dom) {
-    fiber.dom = creatDom(fiber);
+  const isFunctionComponent = fiber.type instanceof Function;
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber);
+  } else {
+    updateHostComponent(fiber);
   }
 
-  // 为每一个chid创建一个新的 fiber
-  const elements = fiber.props.children;
-  // let index = 0;
-  // 记录上一个fiber
-  // let prevSibling = null;
-  //下面的while是构建Fiber树，为了实现diff算法，需要重构。
-  // while (index < elements.length) {
-  //   const element = elements[index];
-
-  //   const newFiber = {
-  //     // 记录元素标签类型
-  //     type: element.type,
-  //     // 记录元素属性
-  //     props: element.props,
-  //     // 与父节点创建链接
-  //     parent: fiber,
-  //     // 此时DOM还未生成 初始化null
-  //     // 下一次进入performUnitOfWork时
-  //     // 通过createDOM函数生成
-  //     dom: null,
-  //     // 与第一个子节点关联 初始化null
-  //     child: null,
-  //     // 与兄弟节点创建链接 初始化null
-  //     sibling: null,
-  //   };
-  //   if (index === 0) {
-  //     fiber.child = newFiber;
-  //   } else {
-  //     prevSibling.sibling = newFiber;
-  //   }
-  //   prevSibling = newFiber;
-  //   index++;
-  // }
-
-  //重构如下
-  // 此函数接收两个参数：即将被处理的fiber(wipFiber)以及它的子元素(elements)
-  reconcileChildren(fiber, elements);
+  // 处理非函数式组件
+  function updateHostComponent(fiber) {
+    if (!fiber.dom) {
+      fiber.dom = createDom(fiber);
+    }
+    const elements = fiber.props.children;
+    reconcileChildren(fiber, elements);
+  }
+  // 处理函数式组件
+  function updateFunctionComponent(fiber) {
+    const children = [fiber.type(fiber.props)];
+    reconcileChildren(fiber, children);
+  }
 
   // 选出下一个工作单元
   if (fiber.child) {
@@ -170,20 +148,17 @@ function commitWork(fiber) {
   if (!fiber) {
     return;
   }
-  // const domParent = fiber.parent.dom;
-  // if (fiber.effectTag === "PLACEMENT" && fiber.dom) {
-  //   // domParent.appendChild(fiber.dom);
-  //   domParent.append(fiber.dom);
-  // } else if (fiber.effectTag === "UPDATE" && fiber.dom) {
-  //   updateDom(fiber.dom, fiber.alternate.props, fiber.props);
-  // } else if (fiber.effectTag === "DELETION") {
-  //   domParent.removeChild(fiber.dom);
-  // }
-  const parentDOM = fiber.parent.dom;
+  //递归向上寻找，直至遇到第一个祖先节点的dom
+  let parentDOMFiber = fiber.parent;
+  while (!parentDOMFiber.dom) {
+    parentDOMFiber = parentDOMFiber.parent;
+  }
+  const parentDOM = parentDOMFiber.dom;
   if (fiber.effectTag === "PLACEMENT" && fiber.dom) {
     parentDOM.append(fiber.dom);
   } else if (fiber.effectTag === "DELETION" && fiber.dom) {
-    parentDOM.removeChild(fiber.dom);
+    // parentDOM.removeChild(fiber.dom);
+    commitDeletion(fiber, parentDOM);
   } else if (fiber.effectTag === "UPDATE" && fiber.dom) {
     updateDom(fiber.dom, fiber.alternate.props, fiber.props);
   }
@@ -191,6 +166,14 @@ function commitWork(fiber) {
   commitWork(fiber.child);
   commitWork(fiber.sibling);
 }
+function commitDeletion(fiber, parentDOM) {
+  if (fiber.dom) {
+    parentDOM.removeChild(fiber.dom);
+  } else {
+    commitDeletion(fiber.child, parentDOM);
+  }
+}
+
 function updateDom(dom, prevProps, nextProps) {
   // 删除已经没有的props
   Object.keys(prevProps)
